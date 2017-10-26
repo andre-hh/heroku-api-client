@@ -1,14 +1,14 @@
 <?php
 declare(strict_types=1);
 
-namespace HerokuApiBundle;
+namespace HerokuApiClient;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
-use HerokuApiBundle\Exceptions\HerokuApiException;
+use HerokuApiClient\Exceptions\HerokuApiException;
 use Psr\Log\LoggerInterface;
 
-class HerokuApiService
+class HerokuApi
 {
     const DYNO_TYPE_FREE = 'free';
     const DYNO_TYPE_HOBBY = 'hobby';
