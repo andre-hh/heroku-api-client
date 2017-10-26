@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace HerokuApiBundle\Exceptions;
+namespace HerokuApiClient\Exceptions;
 
 class HerokuApiException extends \Exception
 {
