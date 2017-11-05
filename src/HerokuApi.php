@@ -116,7 +116,10 @@ class HerokuApi
             throw new HerokuApiException();
         }
 
-        $this->logger->debug('One-off dyno "' . $contents['name'] . '" (' . $dynoType . ') has been triggered.');
+        $this->logger->debug(
+            'One-off dyno "' . $contents['name'] . '" (' . $dynoType . ') has been triggered to execute "'
+                . $command . '".'
+        );
 
         return $contents['name'];
     }
