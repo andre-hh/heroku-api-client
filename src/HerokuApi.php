@@ -40,19 +40,20 @@ class HerokuApi
      * @see https://devcenter.heroku.com/articles/limits#dynos
      *
      * @param string $dynoType
+     * @param bool $allowSwapping
      */
-    public static function setMemoryLimitBasedOnDynoType(string $dynoType)
+    public static function setMemoryLimitBasedOnDynoType(string $dynoType, bool $allowSwapping = false)
     {
         self::validateDynoType($dynoType);
 
         if (in_array($dynoType, [self::DYNO_TYPE_FREE, self::DYNO_TYPE_HOBBY, self::DYNO_TYPE_STANDARD_1X])) {
-            ini_set('memory_limit', '512M');
+            ini_set('memory_limit', ($allowSwapping ? '1024M' : '512M'));
         } elseif ($dynoType === self::DYNO_TYPE_STANDARD_2X) {
-            ini_set('memory_limit', '1024M');
+            ini_set('memory_limit', ($allowSwapping ? '2048M' : '1024M'));
         } elseif ($dynoType === self::DYNO_TYPE_PERFORMANCE_M) {
-            ini_set('memory_limit', '2500M');
+            ini_set('memory_limit', ($allowSwapping ? '5000M' : '2500M'));
         } elseif ($dynoType === self::DYNO_TYPE_PERFORMANCE_L) {
-            ini_set('memory_limit', '14000M');
+            ini_set('memory_limit', ($allowSwapping ? '28000M' : '14000M'));
         }
     }
 
