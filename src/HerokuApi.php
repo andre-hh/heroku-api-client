@@ -40,20 +40,24 @@ class HerokuApi
      * @see https://devcenter.heroku.com/articles/limits#dynos
      *
      * @param string $dynoType
-     * @param bool $allowSwapping
+     * @param int $allowSwap The percentage of available swap that should be allowed to use.
      */
-    public static function setMemoryLimitBasedOnDynoType(string $dynoType, bool $allowSwapping = false)
+    public static function setMemoryLimitBasedOnDynoType(string $dynoType, int $allowSwap = 0)
     {
         self::validateDynoType($dynoType);
 
+        if ($allowSwap < 0 || $allowSwap > 1) {
+            throw new \InvalidArgumentException('$allowSwap must be a value between 0 and 1');
+        }
+
         if (in_array($dynoType, [self::DYNO_TYPE_FREE, self::DYNO_TYPE_HOBBY, self::DYNO_TYPE_STANDARD_1X])) {
-            ini_set('memory_limit', ($allowSwapping ? '1024M' : '512M'));
+            ini_set('memory_limit', ((512 * $allowSwap + 512) . 'M'));
         } elseif ($dynoType === self::DYNO_TYPE_STANDARD_2X) {
-            ini_set('memory_limit', ($allowSwapping ? '2048M' : '1024M'));
+            ini_set('memory_limit', ((1024 * $allowSwap + 1024) . 'M'));
         } elseif ($dynoType === self::DYNO_TYPE_PERFORMANCE_M) {
-            ini_set('memory_limit', ($allowSwapping ? '5000M' : '2500M'));
+            ini_set('memory_limit', ((2500 * $allowSwap + 2500) . 'M'));
         } elseif ($dynoType === self::DYNO_TYPE_PERFORMANCE_L) {
-            ini_set('memory_limit', ($allowSwapping ? '28000M' : '14000M'));
+            ini_set('memory_limit', ((14000 * $allowSwap + 14000) . 'M'));
         }
     }
 
