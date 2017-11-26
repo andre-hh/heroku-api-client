@@ -40,9 +40,9 @@ class HerokuApi
      * @see https://devcenter.heroku.com/articles/limits#dynos
      *
      * @param string $dynoType
-     * @param int $allowSwap The percentage of available swap that should be allowed to use.
+     * @param float $allowSwap The percentage of available swap that should be allowed to use.
      */
-    public static function setMemoryLimitBasedOnDynoType(string $dynoType, int $allowSwap = 0)
+    public static function setMemoryLimitBasedOnDynoType(string $dynoType, float $allowSwap = 0)
     {
         self::validateDynoType($dynoType);
 
