@@ -110,14 +110,14 @@ class HerokuApi
                 ['json' => ['attach' => false, 'command' => $command, 'size' => $dynoType,],]
             );
         } catch (RequestException $e) {
-            $this->logger->error('Heroku API-request to run one-off dyno failed (' . $e->getMessage() . ').');
+            $this->logger->error('Heroku API request to run one-off dyno failed (' . $e->getMessage() . ').');
             throw new HerokuApiException();
         }
 
         $body = $response->getBody()->getContents();
         $contents = json_decode($body, true);
         if (!is_array($contents) || !array_key_exists('name', $contents)) {
-            $this->logger->error('Heroku API-request to run one-off dyno failed (response: ' . $body . ').');
+            $this->logger->error('Heroku API request to run one-off dyno failed (response: ' . $body . ').');
             throw new HerokuApiException();
         }
 
@@ -143,7 +143,7 @@ class HerokuApi
         try {
             $response = $this->client->get('apps/' . $this->app. '/dynos', ['timeout' => 10,]);
         } catch (RequestException $e) {
-            $error = 'Heroku API-request to get dyno list failed (' . $e->getMessage() . ')';
+            $error = 'Heroku API request to get dyno list failed (' . $e->getMessage() . ')';
             if ($attempts > 1) {
                 $this->logger->error($error . '; will retry now.');
                 return $this->getDynoList(--$attempts);
@@ -156,7 +156,7 @@ class HerokuApi
         $body = $response->getBody()->getContents();
         $contents = json_decode($body, true);
         if (!is_array($contents)) {
-            $error = 'Heroku API-request to get dyno list failed (response: ' . $body . ').';
+            $error = 'Heroku API request to get dyno list failed (response: ' . $body . ').';
             if ($attempts > 1) {
                 $this->logger->error($error . '; will retry now.');
                 return $this->getDynoList(--$attempts);
@@ -167,6 +167,45 @@ class HerokuApi
         }
 
         return $contents;
+    }
+
+    /**
+     * Updates the given process type of the dyno formation.
+     *
+     * TODO: There is also a method for bulk updates.
+     *
+     * @param string $process
+     * @param string $quantity
+     * @param string $dynoType
+     * @throws HerokuApiException
+     */
+    public function updateFormation(string $process, string $quantity, string $dynoType)
+    {
+        self::validateDynoType($dynoType);
+
+        try {
+            $response = $this->client->patch(
+                'apps/' . $this->app. '/formation/' . $process,
+                ['json' => ['quantity' => $quantity, 'size' => $dynoType],]
+            );
+        } catch (RequestException $e) {
+            $this->logger->error('Heroku API request to update formation failed (' . $e->getMessage() . ').');
+            throw new HerokuApiException();
+        }
+
+        $body = $response->getBody()->getContents();
+        $contents = json_decode($body, true);
+        if (!is_array($contents) || count($contents) !== 1 || !is_array($contents[0])
+            || array_diff(['size', 'quantity', 'type'], $contents[0]))
+        {
+            $this->logger->error('Heroku API request to update formation failed (unexpected response: ' . $body . ').');
+            throw new HerokuApiException();
+        }
+
+        $this->logger->debug(
+            'Updated formation (changed process type "' . $process . '" to dyno type "' . $dynoType . '" and quantity '
+                . $quantity . ').'
+        );
     }
 
     /**
