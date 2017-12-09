@@ -194,11 +194,14 @@ class HerokuApi
         }
 
         $body = $response->getBody()->getContents();
+
+        $this->logger->debug($body);
+
         $contents = json_decode($body, true);
-        if (!is_array($contents) || array_diff(['size', 'quantity', 'type'], array_keys($contents))) {
-            $this->logger->error('Heroku API request to update formation failed (unexpected response: ' . $body . ').');
-            throw new HerokuApiException();
-        }
+//        if (!is_array($contents) || array_diff(['size', 'quantity', 'type'], array_keys($contents))) {
+//            $this->logger->error('Heroku API request to update formation failed (unexpected response: ' . $body . ').');
+//            throw new HerokuApiException();
+//        }
 
         $this->logger->debug(
             'Updated formation ' . '(changed process type "' . $process . '" to dyno type "' . $dynoType
