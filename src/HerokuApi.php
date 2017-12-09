@@ -36,32 +36,6 @@ class HerokuApi
     }
 
     /**
-     * Sets PHP's memory limit based on the the given dyno type's capabilities.
-     * @see https://devcenter.heroku.com/articles/limits#dynos
-     *
-     * @param string $dynoType
-     * @param float $allowSwap The percentage of available swap that should be allowed to use.
-     */
-    public static function setMemoryLimitBasedOnDynoType(string $dynoType, float $allowSwap = 0)
-    {
-        self::validateDynoType($dynoType);
-
-        if ($allowSwap < 0 || $allowSwap > 1) {
-            throw new \InvalidArgumentException('$allowSwap must be a value between 0 and 1');
-        }
-
-        if (in_array($dynoType, [self::DYNO_TYPE_FREE, self::DYNO_TYPE_HOBBY, self::DYNO_TYPE_STANDARD_1X])) {
-            ini_set('memory_limit', ((512 * $allowSwap + 512) . 'M'));
-        } elseif ($dynoType === self::DYNO_TYPE_STANDARD_2X) {
-            ini_set('memory_limit', ((1024 * $allowSwap + 1024) . 'M'));
-        } elseif ($dynoType === self::DYNO_TYPE_PERFORMANCE_M) {
-            ini_set('memory_limit', ((2500 * $allowSwap + 2500) . 'M'));
-        } elseif ($dynoType === self::DYNO_TYPE_PERFORMANCE_L) {
-            ini_set('memory_limit', ((14000 * $allowSwap + 14000) . 'M'));
-        }
-    }
-
-    /**
      * @var LoggerInterface
      */
     private $logger;
@@ -92,6 +66,32 @@ class HerokuApi
             'headers' => ['Accept' => 'application/vnd.heroku+json; version=3'],
             'timeout' => 3,
         ]);
+    }
+
+    /**
+     * Sets PHP's memory limit based on the the given dyno type's capabilities.
+     * @see https://devcenter.heroku.com/articles/limits#dynos
+     *
+     * @param string $dynoType
+     * @param float $allowSwap The percentage of available swap that should be allowed to use.
+     */
+    public static function setMemoryLimitBasedOnDynoType(string $dynoType, float $allowSwap = 0)
+    {
+        self::validateDynoType($dynoType);
+
+        if ($allowSwap < 0 || $allowSwap > 1) {
+            throw new \InvalidArgumentException('$allowSwap must be a value between 0 and 1');
+        }
+
+        if (in_array($dynoType, [self::DYNO_TYPE_FREE, self::DYNO_TYPE_HOBBY, self::DYNO_TYPE_STANDARD_1X])) {
+            ini_set('memory_limit', ((512 * $allowSwap + 512) . 'M'));
+        } elseif ($dynoType === self::DYNO_TYPE_STANDARD_2X) {
+            ini_set('memory_limit', ((1024 * $allowSwap + 1024) . 'M'));
+        } elseif ($dynoType === self::DYNO_TYPE_PERFORMANCE_M) {
+            ini_set('memory_limit', ((2500 * $allowSwap + 2500) . 'M'));
+        } elseif ($dynoType === self::DYNO_TYPE_PERFORMANCE_L) {
+            ini_set('memory_limit', ((14000 * $allowSwap + 14000) . 'M'));
+        }
     }
 
     /**
@@ -195,16 +195,14 @@ class HerokuApi
 
         $body = $response->getBody()->getContents();
         $contents = json_decode($body, true);
-        if (!is_array($contents) || count($contents) !== 1 || !is_array($contents[0])
-            || array_diff(['size', 'quantity', 'type'], $contents[0]))
-        {
+        if (!is_array($contents) || array_diff(['size', 'quantity', 'type'], $contents)) {
             $this->logger->error('Heroku API request to update formation failed (unexpected response: ' . $body . ').');
             throw new HerokuApiException();
         }
 
         $this->logger->debug(
-            'Updated formation (changed process type "' . $process . '" to dyno type "' . $dynoType . '" and quantity '
-                . $quantity . ').'
+            'Updated formation ' . '(changed process type "' . $process . '" to dyno type "' . $dynoType
+                . '" and quantity ' . $quantity . ').'
         );
     }
 
