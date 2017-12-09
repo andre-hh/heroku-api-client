@@ -195,7 +195,7 @@ class HerokuApi
 
         $body = $response->getBody()->getContents();
         $contents = json_decode($body, true);
-        if (!is_array($contents) || array_diff(['size', 'quantity', 'type'], $contents)) {
+        if (!is_array($contents) || array_diff(['size', 'quantity', 'type'], array_keys($contents))) {
             $this->logger->error('Heroku API request to update formation failed (unexpected response: ' . $body . ').');
             throw new HerokuApiException();
         }
