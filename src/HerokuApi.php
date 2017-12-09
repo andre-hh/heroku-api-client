@@ -175,11 +175,11 @@ class HerokuApi
      * TODO: There is also a method for bulk updates.
      *
      * @param string $process
-     * @param string $quantity
+     * @param int $quantity
      * @param string $dynoType
      * @throws HerokuApiException
      */
-    public function updateFormation(string $process, string $quantity, string $dynoType)
+    public function updateFormation(string $process, int $quantity, string $dynoType)
     {
         self::validateDynoType($dynoType);
 
