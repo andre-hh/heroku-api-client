@@ -190,7 +190,11 @@ class HerokuApi
             }
         }
 
-        return (int) $contents['quantity'];
+        $quantity = (int) $contents['quantity'];
+
+        $this->logger->debug('Formation quantity of process type "' . $process . '" is ' . $quantity . '.');
+
+        return $quantity;s
     }
 
     /**
