@@ -6,6 +6,7 @@ namespace HerokuApiClient;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
 use HerokuApiClient\Exceptions\HerokuApiException;
+use InvalidArgumentException;
 use Psr\Log\LoggerInterface;
 
 class HerokuApi
@@ -20,10 +21,8 @@ class HerokuApi
     /**
      * Returns all potential dyno types.
      * @see https://devcenter.heroku.com/articles/dyno-types
-     *
-     * @return array
      */
-    public static function getAvailableDynoTypes() : array
+    public static function getAvailableDynoTypes(): array
     {
         return [
             self::DYNO_TYPE_FREE,
@@ -50,11 +49,6 @@ class HerokuApi
      */
     private $client;
 
-    /**
-     * @param LoggerInterface $logger
-     * @param string $app
-     * @param string $apiKey
-     */
     public function __construct(LoggerInterface $logger, string $app, string $apiKey)
     {
         $this->logger = $logger;
@@ -72,8 +66,7 @@ class HerokuApi
      * Sets PHP's memory limit based on the the given dyno type's capabilities.
      * @see https://devcenter.heroku.com/articles/limits#dynos
      *
-     * @param string $dynoType
-     * @param float $allowSwap The percentage of available swap that should be allowed to use.
+     * $allowSwap is the percentage of available swap that should be allowed to use.
      */
     public static function setMemoryLimitBasedOnDynoType(string $dynoType, float $allowSwap = 0)
     {
@@ -95,12 +88,9 @@ class HerokuApi
     }
 
     /**
-     * @param string $command
-     * @param string $dynoType
-     * @return string
      * @throws HerokuApiException
      */
-    public function runOneOffDyno(string $command, string $dynoType = self::DYNO_TYPE_STANDARD_1X) : string
+    public function runOneOffDyno(string $command, string $dynoType = self::DYNO_TYPE_STANDARD_1X): string
     {
         self::validateDynoType($dynoType);
 
@@ -134,11 +124,9 @@ class HerokuApi
      *
      * This endpoint often needs more than 3 seconds to answer.
      *
-     * @param int $attempts
-     * @return array
      * @throws HerokuApiException
      */
-    public function getDynoList(int $attempts = 1) : array
+    public function getDynoList(int $attempts = 1): array
     {
         try {
             $response = $this->client->get('apps/' . $this->app. '/dynos', ['timeout' => 10,]);
@@ -170,13 +158,46 @@ class HerokuApi
     }
 
     /**
+     * Returns the number of currently running dynos of the given process type according to the dyno formation.
+     *
+     * @throws HerokuApiException
+     */
+    public function getFormationQuantity(string $process, int $attempts = 1): int
+    {
+        try {
+            $response = $this->client->get('apps/' . $this->app. '/formation/' . $process, ['timeout' => 10,]);
+        } catch (RequestException $e) {
+            $error = 'Heroku API request to get formation quantity failed (' . $e->getMessage() . ')';
+            if ($attempts > 1) {
+                $this->logger->error($error . '; will retry now.');
+                return $this->getFormationQuantity($process, --$attempts);
+            } else {
+                $this->logger->error($error);
+                throw new HerokuApiException();
+            }
+        }
+
+        $body = $response->getBody()->getContents();
+        $contents = json_decode($body, true);
+        if (!is_array($contents) || !array_key_exists('quantity', $contents)) {
+            $error = 'Heroku API request to get formation quantity failed (response: ' . $body . ').';
+            if ($attempts > 1) {
+                $this->logger->error($error . '; will retry now.');
+                return $this->getFormationQuantity($process, --$attempts);
+            } else {
+                $this->logger->error($error);
+                throw new HerokuApiException();
+            }
+        }
+
+        return (int) $contents['quantity'];
+    }
+
+    /**
      * Updates the given process type of the dyno formation.
      *
      * TODO: There is also a method for bulk updates.
      *
-     * @param string $process
-     * @param int $quantity
-     * @param string $dynoType
      * @throws HerokuApiException
      */
     public function updateFormation(string $process, int $quantity, string $dynoType)
@@ -212,7 +233,7 @@ class HerokuApi
     public static function validateDynoType(string $dynoType)
     {
         if (!in_array($dynoType, self::getAvailableDynoTypes())) {
-            throw new \InvalidArgumentException('Dyno type "' . $dynoType . '" not supported.');
+            throw new InvalidArgumentException('Dyno type "' . $dynoType . '" not supported.');
         }
     }
 }
