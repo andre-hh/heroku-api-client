@@ -121,7 +121,6 @@ class HerokuApi
 
     /**
      * Returns a list of all currently running dynos.
-     *
      * This endpoint often needs more than 3 seconds to answer.
      *
      * @throws HerokuApiException
@@ -232,8 +231,67 @@ class HerokuApi
     }
 
     /**
-     * @param string $dynoType
+     * Kills the specified dyno by its name.
+     *
+     * @throws HerokuApiException
      */
+    public function killDyno(string $dynoName, int $attempts = 1)
+    {
+        try {
+            $this->client->delete('apps/' . $this->app. '/formation/' . $dynoName, ['timeout' => 10,]);
+        } catch (RequestException $e) {
+            $error = 'Heroku API request to kill dyno failed (' . $e->getMessage() . ')';
+            if ($attempts > 1) {
+                $this->logger->error($error . '; will retry now.');
+                return $this->getRemainingTokens(--$attempts);
+            } else {
+                $this->logger->error($error);
+                throw new HerokuApiException();
+            }
+        }
+    }
+
+    /**
+     * Retrieves the number of remaining API tokens (so that an application can avoid hitting Heroku's API rate-limit).
+     * @see https://devcenter.heroku.com/articles/platform-api-reference#rate-limit
+     *
+     * @throws HerokuApiException
+     */
+    public function getRemainingTokens(int $attempts = 1): int
+    {
+        try {
+            $response = $this->client->get('account/rate-limits', ['timeout' => 10,]);
+        } catch (RequestException $e) {
+            $error = 'Heroku API request to get remaining API tokens failed (' . $e->getMessage() . ')';
+            if ($attempts > 1) {
+                $this->logger->error($error . '; will retry now.');
+                return $this->getRemainingTokens(--$attempts);
+            } else {
+                $this->logger->error($error);
+                throw new HerokuApiException();
+            }
+        }
+
+        $body = $response->getBody()->getContents();
+        $contents = json_decode($body, true);
+        if (!is_array($contents) || !array_key_exists('remaining', $contents)) {
+            $error = 'Heroku API request to get remaining API tokens failed (response: ' . $body . ').';
+            if ($attempts > 1) {
+                $this->logger->error($error . '; will retry now.');
+                return $this->getRemainingTokens(--$attempts);
+            } else {
+                $this->logger->error($error);
+                throw new HerokuApiException();
+            }
+        }
+
+        $quantity = (int) $contents['remaining'];
+
+        $this->logger->debug('Got ' . $quantity . ' remaining API tokens.');
+
+        return $quantity;
+    }
+
     public static function validateDynoType(string $dynoType)
     {
         if (!in_array($dynoType, self::getAvailableDynoTypes())) {
