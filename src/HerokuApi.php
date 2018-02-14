@@ -243,7 +243,7 @@ class HerokuApi
             $error = 'Heroku API request to kill dyno failed (' . $e->getMessage() . ')';
             if ($attempts > 1) {
                 $this->logger->error($error . '; will retry now.');
-                return $this->getRemainingTokens(--$attempts);
+                return $this->killDyno($dynoName, --$attempts);
             } else {
                 $this->logger->error($error);
                 throw new HerokuApiException();
@@ -285,11 +285,7 @@ class HerokuApi
             }
         }
 
-        $quantity = (int) $contents['remaining'];
-
-        $this->logger->debug('Got ' . $quantity . ' remaining API tokens.');
-
-        return $quantity;
+        return (int) $contents['remaining'];
     }
 
     public static function validateDynoType(string $dynoType)
