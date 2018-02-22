@@ -252,6 +252,31 @@ class HerokuApi
     }
 
     /**
+     * Returns the charges (e.g. in cents) of the current calender month.
+     *
+     * @throws HerokuApiException
+     */
+    public function getAccountInvoices(): array
+    {
+        try {
+            $response = $this->client->get('account/invoices', ['timeout' => 10,]);
+        } catch (RequestException $e) {
+            $this->logger->error('Heroku API request to get invoices failed (' . $e->getMessage() . ').');
+            throw new HerokuApiException();
+        }
+
+
+        $body = $response->getBody()->getContents();
+        $contents = json_decode(trim($body), true);
+        if (!is_array($contents)) {
+            $this->logger->error('Heroku API request to get invoices failed (unexpected response: ' . $body . ').');
+            throw new HerokuApiException();
+        }
+
+        return $contents;
+    }
+
+    /**
      * Retrieves the number of remaining API tokens (so that an application can avoid hitting Heroku's API rate-limit).
      * @see https://devcenter.heroku.com/articles/platform-api-reference#rate-limit
      *
