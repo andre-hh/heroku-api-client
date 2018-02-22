@@ -252,12 +252,16 @@ class HerokuApi
     }
 
     /**
-     * Returns the charges (e.g. in cents) of the current calender month.
+     * Either returns all invoices or the invoice of the requested month.
      *
      * @throws HerokuApiException
      */
-    public function getAccountInvoices(): array
+    public function getAccountInvoices(string $month = null): array
     {
+        if ($month !== null && (strlen($month) != 7 || strpos($month, '-') != 4)) {
+            throw new InvalidArgumentException('If month is provided, its format must be YYYY-MM.');
+        }
+
         try {
             $response = $this->client->get('account/invoices', ['timeout' => 10,]);
         } catch (RequestException $e) {
@@ -265,12 +269,27 @@ class HerokuApi
             throw new HerokuApiException();
         }
 
-
         $body = $response->getBody()->getContents();
         $contents = json_decode(trim($body), true);
         if (!is_array($contents)) {
             $this->logger->error('Heroku API request to get invoices failed (unexpected response: ' . $body . ').');
             throw new HerokuApiException();
+        }
+
+        if ($month !== null) {
+            foreach ($contents as $invoice) {
+                if (!array_key_exists('period_start', $invoice)) {
+                    $this->logger->error(
+                        'Heroku API request to get invoices failed (unexpected invoice schema).',
+                        $invoice
+                    );
+                    throw new HerokuApiException();
+                }
+
+                if (0 === strpos($invoice['period_start'], ($month . '-01'))) {
+                    return $invoice;
+                }
+            }
         }
 
         return $contents;
