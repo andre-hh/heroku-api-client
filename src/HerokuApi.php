@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace HerokuApiClient;
 
+use DateTime;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
 use HerokuApiClient\Exceptions\HerokuApiException;
@@ -252,7 +253,8 @@ class HerokuApi
     }
 
     /**
-     * Either returns all invoices or the invoice of the requested month.
+     * Either returns all invoices descending sorted by date or the invoice of the requested month or null when no
+     * invoice exists for the requested month.
      *
      * @throws HerokuApiException
      */
@@ -276,21 +278,26 @@ class HerokuApi
             throw new HerokuApiException();
         }
 
+        foreach ($contents as $invoice) {
+            if (!array_key_exists('period_start', $invoice)) {
+                $this->logger->error('Heroku API request to get invoices failed (unexpected schema).', $invoice);
+                throw new HerokuApiException();
+            }
+        }
+
         if ($month !== null) {
             foreach ($contents as $invoice) {
-                if (!array_key_exists('period_start', $invoice)) {
-                    $this->logger->error(
-                        'Heroku API request to get invoices failed (unexpected invoice schema).',
-                        $invoice
-                    );
-                    throw new HerokuApiException();
-                }
-
                 if (0 === strpos($invoice['period_start'], ($month . '-01'))) {
                     return $invoice;
                 }
             }
+
+            return null;
         }
+
+        uasort($contents, function (array $a, array $b) {
+            return strtotime($a['period_start']) - strtotime($b['period_start']);
+        });
 
         return $contents;
     }
