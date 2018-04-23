@@ -146,7 +146,7 @@ class HerokuApi
         if (!is_array($contents)) {
             $error = 'Heroku API request to get dyno list failed (response: ' . $body . ').';
             if ($attempts > 1) {
-                $this->logger->error($error . '; will retry now.');
+                $this->logger->info($error . '; will retry now.');
                 return $this->getDynoList(--$attempts);
             } else {
                 $this->logger->error($error);
