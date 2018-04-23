@@ -169,7 +169,7 @@ class HerokuApi
         } catch (RequestException $e) {
             $error = 'Heroku API request to get formation quantity failed (' . $e->getMessage() . ')';
             if ($attempts > 1) {
-                $this->logger->error($error . '; will retry now.');
+                $this->logger->info($error . '; will retry now.');
                 return $this->getFormationQuantity($process, --$attempts);
             } else {
                 $this->logger->error($error);
@@ -191,7 +191,7 @@ class HerokuApi
         }
 
         $quantity = (int) $contents['quantity'];
-
+        
         $this->logger->debug('Formation quantity of process type "' . $process . '" is ' . $quantity . '.');
 
         return $quantity;
