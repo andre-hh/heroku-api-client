@@ -133,7 +133,7 @@ class HerokuApi
         } catch (RequestException $e) {
             $error = 'Heroku API request to get dyno list failed (' . $e->getMessage() . ')';
             if ($attempts > 1) {
-                $this->logger->error($error . '; will retry now.');
+                $this->logger->info($error . '; will retry now.');
                 return $this->getDynoList(--$attempts);
             } else {
                 $this->logger->error($error);
