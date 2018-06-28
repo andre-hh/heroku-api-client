@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace HerokuApiClient;
 
-use DateTime;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
 use HerokuApiClient\Exceptions\HerokuApiException;
@@ -126,13 +125,14 @@ class HerokuApi
      *
      * @throws HerokuApiException
      */
-    public function getDynoList(int $attempts = 1): array
+    public function getDynoList(int $attempts = 1, $sleepAfterFailedAttempt = 0): array
     {
         try {
             $response = $this->client->get('apps/' . $this->app. '/dynos', ['timeout' => 10,]);
         } catch (RequestException $e) {
             $error = 'Heroku API request to get dyno list failed (' . $e->getMessage() . ')';
             if ($attempts > 1) {
+                sleep($sleepAfterFailedAttempt);
                 $this->logger->info($error . '; will retry now.');
                 return $this->getDynoList(--$attempts);
             } else {
