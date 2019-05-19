@@ -6,6 +6,7 @@ namespace HerokuApiClient;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
 use HerokuApiClient\Exceptions\HerokuApiException;
+use HerokuApiClient\Exceptions\HerokuDynoNameNotFoundException;
 use InvalidArgumentException;
 use Psr\Log\LoggerInterface;
 
@@ -257,6 +258,12 @@ class HerokuApi
             $this->client->delete('apps/' . $this->app. '/formation/' . $dynoName, ['timeout' => 10,]);
         } catch (RequestException $e) {
             $error = 'Heroku API request to kill dyno failed (' . $e->getMessage() . ')';
+
+            // The specified $dynoName does simply not exist
+            if ($e->getCode() === 404) {
+                throw new HerokuDynoNameNotFoundException();
+            }
+
             if ($attempts > 1) {
                 $this->logger->error($error . '; will retry now.');
                 return $this->killDyno($dynoName, --$attempts);
