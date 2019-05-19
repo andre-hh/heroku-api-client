@@ -198,7 +198,7 @@ class HerokuApi
         if (!is_array($contents) || !array_key_exists('quantity', $contents)) {
             $error = 'Heroku API request to get formation quantity failed (response: ' . $body . ').';
             if ($attempts > 1) {
-                $this->logger->error($error . '; will retry now.');
+                $this->logger->info($error . '; will retry now.');
                 return $this->getFormationQuantity($process, --$attempts);
             } else {
                 $this->logger->error($error);
@@ -251,24 +251,27 @@ class HerokuApi
      * Kills the specified dyno by its name.
      *
      * @throws HerokuApiException
+     * @throws HerokuDynoNameNotFoundException
      */
     public function killDyno(string $dynoName, int $attempts = 1)
     {
         try {
             $this->client->delete('apps/' . $this->app. '/formation/' . $dynoName, ['timeout' => 10,]);
         } catch (RequestException $e) {
-            $error = 'Heroku API request to kill dyno failed (' . $e->getMessage() . ')';
+
+            $message = 'Heroku API request to kill dyno failed (' . $e->getMessage() . ')';
 
             // The specified $dynoName does simply not exist
             if ($e->getCode() === 404) {
+                $this->logger->debug($message);
                 throw new HerokuDynoNameNotFoundException();
             }
 
             if ($attempts > 1) {
-                $this->logger->error($error . '; will retry now.');
+                $this->logger->info($message . '; will retry now.');
                 return $this->killDyno($dynoName, --$attempts);
             } else {
-                $this->logger->error($error);
+                $this->logger->error($message);
                 throw new HerokuApiException();
             }
         }
