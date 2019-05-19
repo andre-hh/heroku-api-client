@@ -34,19 +34,13 @@ class HerokuApi
         ];
     }
 
-    /**
-     * @var LoggerInterface
-     */
+    /** @var LoggerInterface */
     private $logger;
 
-    /**
-     * @var string
-     */
+    /** @var string */
     private $app;
 
-    /**
-     * @var Client
-     */
+    /** @var Client */
     private $client;
 
     public function __construct(LoggerInterface $logger, string $app, string $apiKey)
@@ -122,6 +116,27 @@ class HerokuApi
     /**
      * Returns a list of all currently running dynos.
      * This endpoint often needs more than 3 seconds to answer.
+     *
+     * Example data structure:
+     * array:11 [
+     *   "attach_url" => null
+     *   "command" => "vendor/bin/heroku-php-apache2 public/"
+     *   "created_at" => "2019-05-19T06:03:45Z"
+     *   "id" => "bf82006e-0d46-429d-afc5-e2f7bdb3a6be"
+     *   "name" => "web.1"
+     *   "app" => array:2 [
+     *     "id" => "1394f69c-851e-43c9-b5f7-c8617acf7574"
+     *     "name" => "foobar"
+     *   ]
+     *   "release" => array:2 [
+     *     "id" => "38c89e55-8779-48d5-abea-b39a35ab080c"
+     *     "version" => 458
+     *   ]
+     *   "size" => "Standard-1X"
+     *   "state" => "up"
+     *   "type" => "web"
+     *   "updated_at" => "2019-05-19T06:03:45Z"
+     * ]
      *
      * @throws HerokuApiException
      */
