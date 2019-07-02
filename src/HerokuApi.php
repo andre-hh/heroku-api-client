@@ -231,6 +231,17 @@ class HerokuApi
             );
         } catch (RequestException $e) {
             $this->logger->error('Heroku API request to update formation failed (' . $e->getMessage() . ').');
+
+            $contents = json_decode($e->getResponse()->getBody()->getContents(), true);
+
+            if ($e->getCode() === 422
+                && is_array($contents)
+                && array_key_exists('id', $contents)
+                && $contents['id'] === 'cannot_update_above_limit')
+            {
+                throw new HerokuCannotUpdateAboveLimitException();
+            }
+
             throw new HerokuApiException();
         }
 
