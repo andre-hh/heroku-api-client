@@ -6,6 +6,7 @@ namespace HerokuApiClient;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
 use HerokuApiClient\Exceptions\HerokuApiException;
+use HerokuApiClient\Exceptions\HerokuCannotUpdateAboveLimitException;
 use HerokuApiClient\Exceptions\HerokuDynoNameNotFoundException;
 use InvalidArgumentException;
 use Psr\Log\LoggerInterface;
