@@ -220,6 +220,7 @@ class HerokuApi
      * TODO: There is also a method for bulk updates.
      *
      * @throws HerokuApiException
+     * @throws HerokuCannotUpdateAboveLimitException
      */
     public function updateFormation(string $process, int $quantity, string $dynoType)
     {
