@@ -9,7 +9,9 @@ use HerokuApiClient\Exceptions\HerokuApiException;
 use HerokuApiClient\Exceptions\HerokuCannotUpdateAboveLimitException;
 use HerokuApiClient\Exceptions\HerokuDynoNameNotFoundException;
 use InvalidArgumentException;
+use Psr\Http\Message\ResponseInterface;
 use Psr\Log\LoggerInterface;
+use Psr\Log\LogLevel;
 
 class HerokuApi
 {
@@ -40,14 +42,23 @@ class HerokuApi
     private $logger;
 
     /** @var string */
+    private $logLevel;
+
+    /** @var string */
     private $app;
 
     /** @var Client */
     private $client;
 
-    public function __construct(LoggerInterface $logger, string $app, string $apiKey)
+    public function __construct(LoggerInterface $logger, string $app, string $apiKey, string $logLevel = LogLevel::INFO)
     {
+        if (!in_array($logLevel, [LogLevel::DEBUG, LogLevel::INFO,])) {
+            throw new InvalidArgumentException('Log level must be "debug" or "info"');
+        }
+
         $this->logger = $logger;
+        $this->logLevel = $logLevel;
+
         $this->app = $app;
 
         $this->client = new Client([
@@ -64,12 +75,12 @@ class HerokuApi
      *
      * $allowSwap is the percentage of available swap that should be allowed to use.
      */
-    public static function setMemoryLimitBasedOnDynoType(string $dynoType, float $allowSwap = 0)
+    public static function setMemoryLimitBasedOnDynoType(string $dynoType, float $allowSwap = 0): void
     {
         self::validateDynoType($dynoType);
 
         if ($allowSwap < 0 || $allowSwap > 1) {
-            throw new \InvalidArgumentException('$allowSwap must be a value between 0 and 1');
+            throw new InvalidArgumentException('$allowSwap must be a float value between 0 and 1');
         }
 
         if (in_array($dynoType, [self::DYNO_TYPE_FREE, self::DYNO_TYPE_HOBBY, self::DYNO_TYPE_STANDARD_1X])) {
@@ -84,6 +95,8 @@ class HerokuApi
     }
 
     /**
+     * Runs the given command on the given dyno type and returns the name of the dyno running that command.
+     *
      * @throws HerokuApiException
      */
     public function runOneOffDyno(string $command, string $dynoType = self::DYNO_TYPE_STANDARD_1X): string
@@ -93,23 +106,36 @@ class HerokuApi
         try {
             $response = $this->client->post(
                 'apps/' . $this->app. '/dynos',
-                ['json' => ['attach' => false, 'command' => $command, 'size' => $dynoType,],]
+                [
+                    'json' => ['attach' => false, 'command' => $command, 'size' => $dynoType,],
+                    'timeout' => 10,
+                ]
             );
         } catch (RequestException $e) {
-            $this->logger->error('Heroku API request to run one-off dyno failed (' . $e->getMessage() . ').');
-            throw new HerokuApiException();
+            $this->log(
+                'Heroku API request to run one-off dyno failed.',
+                ['exceptionMessage' => $e->getMessage(),]
+            );
+            throw new HerokuApiException(
+                'Heroku API request to run one-off dyno failed (' . $e->getMessage() . ').'
+            );
         }
 
         $body = $response->getBody()->getContents();
         $contents = json_decode($body, true);
         if (!is_array($contents) || !array_key_exists('name', $contents)) {
-            $this->logger->error('Heroku API request to run one-off dyno failed (response: ' . $body . ').');
-            throw new HerokuApiException();
+            $this->log(
+                'Heroku API request to run one-off dyno failed.',
+                ['responseBody' => $body,]
+            );
+            throw new HerokuApiException(
+                'Heroku API request to run one-off dyno failed (response: ' . $body . ').'
+            );
         }
 
-        $this->logger->debug(
-            'One-off dyno "' . $contents['name'] . '" (' . $dynoType . ') has been triggered to execute "'
-                . $command . '".'
+        $this->log(
+            'One-off dyno has been triggered.',
+            ['dynoName' => $contents['name'], 'dynoType' => $dynoType, 'command' => $command,]
         );
 
         return $contents['name'];
@@ -142,32 +168,37 @@ class HerokuApi
      *
      * @throws HerokuApiException
      */
-    public function getDynoList(int $attempts = 1, $sleepAfterFailedAttempt = 0): array
+    public function getDynoList(int $attempts = 1, int $sleepAfterFailedAttempt = 0): array
     {
         try {
             $response = $this->client->get('apps/' . $this->app. '/dynos', ['timeout' => 10,]);
         } catch (RequestException $e) {
-            $error = 'Heroku API request to get dyno list failed (' . $e->getMessage() . ')';
+            $this->log(
+                'Heroku API request to get dyno list failed.',
+                ['exceptionMessage' => $e->getMessage(),]
+            );
             if ($attempts > 1) {
                 sleep($sleepAfterFailedAttempt);
-                $this->logger->info($error . '; will retry now.');
+                $this->log('Will retry to get dyno list now.');
                 return $this->getDynoList(--$attempts);
             } else {
-                $this->logger->error($error);
-                throw new HerokuApiException();
+                throw new HerokuApiException(
+                    'Heroku API request to get dyno list failed (' . $e->getMessage() . ').'
+                );
             }
         }
 
         $body = $response->getBody()->getContents();
         $contents = json_decode($body, true);
         if (!is_array($contents)) {
-            $error = 'Heroku API request to get dyno list failed (response: ' . $body . ').';
+            $this->log('Heroku API request to get dyno list failed.', ['responseBody' => $body,]);
             if ($attempts > 1) {
-                $this->logger->info($error . '; will retry now.');
+                $this->log('Will retry to get dyno list now.');
                 return $this->getDynoList(--$attempts);
             } else {
-                $this->logger->error($error);
-                throw new HerokuApiException();
+                throw new HerokuApiException(
+                    'Heroku API request to get dyno list failed (response: ' . $body . ').'
+                );
             }
         }
 
@@ -184,32 +215,37 @@ class HerokuApi
         try {
             $response = $this->client->get('apps/' . $this->app. '/formation/' . $process, ['timeout' => 10,]);
         } catch (RequestException $e) {
-            $error = 'Heroku API request to get formation quantity failed (' . $e->getMessage() . ')';
+            $this->log(
+                'Heroku API request to get formation quantity failed.',
+                ['exceptionMessage' => $e->getMessage(),]
+            );
             if ($attempts > 1) {
-                $this->logger->info($error . '; will retry now.');
+                $this->log('Will retry to get formation quantity now.');
                 return $this->getFormationQuantity($process, --$attempts);
             } else {
-                $this->logger->error($error);
-                throw new HerokuApiException();
+                throw new HerokuApiException(
+                    'Heroku API request to get formation quantity failed (' . $e->getMessage() . ').'
+                );
             }
         }
 
         $body = $response->getBody()->getContents();
         $contents = json_decode($body, true);
         if (!is_array($contents) || !array_key_exists('quantity', $contents)) {
-            $error = 'Heroku API request to get formation quantity failed (response: ' . $body . ').';
+            $this->log('Heroku API request to get formation quantity failed.', ['responseBody' => $body,]);
             if ($attempts > 1) {
-                $this->logger->info($error . '; will retry now.');
+                $this->log('Will retry to get formation quantity now.');
                 return $this->getFormationQuantity($process, --$attempts);
             } else {
-                $this->logger->error($error);
-                throw new HerokuApiException();
+                throw new HerokuApiException(
+                    'Heroku API request to get dyno list failed (response: ' . $body . ').'
+                );
             }
         }
 
         $quantity = (int) $contents['quantity'];
-        
-        $this->logger->debug('Formation quantity of process type "' . $process . '" is ' . $quantity . '.');
+
+        $this->log('Got formation quantity of process type "' . $process . '" is ' . $quantity . '.');
 
         return $quantity;
     }
@@ -222,7 +258,7 @@ class HerokuApi
      * @throws HerokuApiException
      * @throws HerokuCannotUpdateAboveLimitException
      */
-    public function updateFormation(string $process, int $quantity, string $dynoType)
+    public function updateFormation(string $process, int $quantity, string $dynoType): void
     {
         self::validateDynoType($dynoType);
 
@@ -232,31 +268,55 @@ class HerokuApi
                 ['json' => ['quantity' => $quantity, 'size' => $dynoType],]
             );
         } catch (RequestException $e) {
-            $this->logger->error('Heroku API request to update formation failed (' . $e->getMessage() . ').');
 
-            $contents = json_decode($e->getResponse()->getBody()->getContents(), true);
+            $contents = null;
+
+            // This satisfies Psalm
+            if ($e->getResponse() instanceof ResponseInterface) {
+                $response = $e->getResponse();
+                /** @var ResponseInterface $response */
+                $contents = json_decode($response->getBody()->getContents(), true);
+            }
 
             if ($e->getCode() === 422
                 && is_array($contents)
                 && array_key_exists('id', $contents)
                 && $contents['id'] === 'cannot_update_above_limit')
             {
-                throw new HerokuCannotUpdateAboveLimitException();
+                $this->log(
+                    'Heroku API request to update formation above limit failed.',
+                    ['exceptionMessage' => $e->getMessage(), 'responseBody' => $contents,]
+                );
+                throw new HerokuCannotUpdateAboveLimitException(
+                    'Heroku API request to update formation failed (cannot update above limit).'
+                );
             }
 
-            throw new HerokuApiException();
+            $this->log(
+                'Heroku API request to update formation failed.',
+                ['exceptionMessage' => $e->getMessage(), 'responseBody' => $contents,]
+            );
+            throw new HerokuApiException(
+                'Heroku API request to update formation failed (' . $e->getMessage() . ').'
+            );
         }
 
         $body = $response->getBody()->getContents();
         $contents = json_decode(trim($body), true);
         if (!is_array($contents) || count(array_diff(['size', 'quantity', 'type'], array_keys($contents))) > 0) {
-            $this->logger->error('Heroku API request to update formation failed (unexpected response: ' . $body . ').');
-            throw new HerokuApiException();
+            $this->log('Heroku API request to update formation failed.', ['responseBody' => $contents,]);
+            throw new HerokuApiException(
+                'Heroku API request to update formation failed (unexpected response: ' . $body . ').'
+            );
         }
 
         $this->logger->debug(
-            'Updated formation ' . '(changed process type "' . $process . '" to dyno type "' . $dynoType
-                . '" and quantity ' . $quantity . ').'
+            'Updated formation.',
+            [
+                'processType' => $process,
+                'newDynoType' => $dynoType,
+                'newQuantity' => $quantity,
+            ]
         );
     }
 
@@ -266,26 +326,28 @@ class HerokuApi
      * @throws HerokuApiException
      * @throws HerokuDynoNameNotFoundException
      */
-    public function killDyno(string $dynoName, int $attempts = 1)
+    public function killDyno(string $dynoName, int $attempts = 1): void
     {
         try {
             $this->client->delete('apps/' . $this->app. '/formation/' . $dynoName, ['timeout' => 10,]);
         } catch (RequestException $e) {
 
-            $message = 'Heroku API request to kill dyno failed (' . $e->getMessage() . ')';
-
             // The specified $dynoName does simply not exist
             if ($e->getCode() === 404) {
-                $this->logger->debug($message);
-                throw new HerokuDynoNameNotFoundException();
+                $this->log('Heroku API request to kill dyno failed as "' . $dynoName . '" was not found.');
+                throw new HerokuDynoNameNotFoundException(
+                    'Heroku API request to kill dyno failed as "' . $dynoName . '" was not found.'
+                );
             }
 
+            $this->log('Heroku API request to kill dyno failed.', ['exceptionMessage' => $e->getMessage()]);
             if ($attempts > 1) {
-                $this->logger->info($message . '; will retry now.');
-                return $this->killDyno($dynoName, --$attempts);
+                $this->log('Will retry killing dyno now.');
+                $this->killDyno($dynoName, --$attempts);
             } else {
-                $this->logger->error($message);
-                throw new HerokuApiException();
+                throw new HerokuApiException(
+                    'Heroku API request to kill dyno failed (' . $e->getMessage() . ').'
+                );
             }
         }
     }
@@ -296,7 +358,7 @@ class HerokuApi
      *
      * @throws HerokuApiException
      */
-    public function getAccountInvoices(string $month = null): array
+    public function getAccountInvoices(string $month = null): ?array
     {
         if ($month !== null && (strlen($month) != 7 || strpos($month, '-') != 4)) {
             throw new InvalidArgumentException('If month is provided, its format must be YYYY-MM.');
@@ -305,20 +367,22 @@ class HerokuApi
         try {
             $response = $this->client->get('account/invoices', ['timeout' => 10,]);
         } catch (RequestException $e) {
-            $this->logger->error('Heroku API request to get invoices failed (' . $e->getMessage() . ').');
+            $this->log('Heroku API request to get invoices failed.', ['exceptionMessage' => $e->getMessage()]);
             throw new HerokuApiException();
         }
 
         $body = $response->getBody()->getContents();
         $contents = json_decode(trim($body), true);
         if (!is_array($contents)) {
-            $this->logger->error('Heroku API request to get invoices failed (unexpected response: ' . $body . ').');
-            throw new HerokuApiException();
+            $this->log('Heroku API request to get invoices failed.', ['responseBody' => $contents,]);
+            throw new HerokuApiException(
+                'Heroku API request to get invoices failed (unexpected response: ' . $body . ').'
+            );
         }
 
         foreach ($contents as $invoice) {
             if (!array_key_exists('period_start', $invoice)) {
-                $this->logger->error('Heroku API request to get invoices failed (unexpected schema).', $invoice);
+                $this->log('Heroku API request to get invoices failed (unexpected schema).', $invoice);
                 throw new HerokuApiException();
             }
         }
@@ -341,7 +405,7 @@ class HerokuApi
     }
 
     /**
-     * Retrieves the number of remaining API tokens (so that an application can avoid hitting Heroku's API rate-limit).
+     * Returns the number of remaining API tokens (so that an application can avoid hitting Heroku's API rate-limit).
      * @see https://devcenter.heroku.com/articles/platform-api-reference#rate-limit
      *
      * @throws HerokuApiException
@@ -351,12 +415,14 @@ class HerokuApi
         try {
             $response = $this->client->get('account/rate-limits', ['timeout' => 10,]);
         } catch (RequestException $e) {
-            $error = 'Heroku API request to get remaining API tokens failed (' . $e->getMessage() . ')';
+            $this->log(
+                'Heroku API request to get remaining API tokens failed.',
+                ['exceptionMessage' => $e->getMessage(),]
+            );
             if ($attempts > 1) {
-                $this->logger->error($error . '; will retry now.');
+                $this->log('Will retry getting remaining API tokens now.');
                 return $this->getRemainingTokens(--$attempts);
             } else {
-                $this->logger->error($error);
                 throw new HerokuApiException();
             }
         }
@@ -364,12 +430,14 @@ class HerokuApi
         $body = $response->getBody()->getContents();
         $contents = json_decode($body, true);
         if (!is_array($contents) || !array_key_exists('remaining', $contents)) {
-            $error = 'Heroku API request to get remaining API tokens failed (response: ' . $body . ').';
+            $this->log(
+                'Heroku API request to get remaining API tokens failed.',
+                ['responseBody' => $body,]
+            );
             if ($attempts > 1) {
-                $this->logger->error($error . '; will retry now.');
+                $this->log('Will retry getting remaining API tokens now.');
                 return $this->getRemainingTokens(--$attempts);
             } else {
-                $this->logger->error($error);
                 throw new HerokuApiException();
             }
         }
@@ -377,10 +445,15 @@ class HerokuApi
         return (int) $contents['remaining'];
     }
 
-    public static function validateDynoType(string $dynoType)
+    public static function validateDynoType(string $dynoType): void
     {
         if (!in_array($dynoType, self::getAvailableDynoTypes())) {
             throw new InvalidArgumentException('Dyno type "' . $dynoType . '" not supported.');
         }
+    }
+
+    private function log(string $message, array $context = []): void
+    {
+        $this->logger->log($this->logLevel, $message, $context);
     }
 }
