@@ -1,10 +1,10 @@
 version: "3.4"
 
 services:
-    heroku-ap-client-cli:
+    heroku-api-client-cli:
         build:
             context: .
             dockerfile: .docker/Dockerfile
-        container_name: heroku-ap-client-cli
+        container_name: heroku-api-client-cli
         volumes:
             - .:/var/www/html:delegated
