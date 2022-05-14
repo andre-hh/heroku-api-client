@@ -23,7 +23,6 @@ WORKDIR /var/www/html
 COPY --chown=www-data:www-data . /var/www/html
 
 # Install composer dependencies
-# (dev dependencies should be installed locally manually)
 RUN composer install
 
 RUN date > container_created_at

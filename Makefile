@@ -2,13 +2,13 @@
 .DEFAULT_GOAL:=help
 
 bash: ## Opens a new bash inside a container.
-	docker-compose run --rm heroku-ap-client-cli bash
+	docker-compose run --rm heroku-api-client-cli bash
 
 build: ## Rebuilds all containers.
 	docker-compose build
 
 composer-update: ## Runs composer update in a new container.
-	docker-compose run --rm heroku-ap-client-cli bash -c "COMPOSER_MEMORY_LIMIT=-1 composer update; exit $?"
+	docker-compose run --rm heroku-api-client-cli bash -c "COMPOSER_MEMORY_LIMIT=-1 composer update; exit $?"
 
 down: ## Stops the local development services.
 	docker-compose down
