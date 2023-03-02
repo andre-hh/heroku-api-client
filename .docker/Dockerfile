@@ -1,4 +1,4 @@
-FROM php:8.0-cli
+FROM php:8.2-cli
 
 # Install composer with composer-installer.sh
 COPY .docker/composer-installer.sh /usr/local/bin/composer-installer
